@@ -1,6 +1,8 @@
 package server;
 
-public class ScoreManager {
+import java.rmi.RemoteException;
+
+public class ScoreManager  {
     private int highestScore;
 
     public synchronized void updateHighestScore(int newScore) {
@@ -13,9 +15,6 @@ public class ScoreManager {
         return highestScore;
     }
 
-    public enum GameStatus {
-        IN_PROGRESS,
-        COMPLETED,
-        NOT_STARTED
-    }
+
+
 }
