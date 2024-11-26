@@ -1,18 +1,17 @@
 package client;
 
 import java.io.IOException;
+import java.rmi.RemoteException;
 import java.util.Scanner;
 
-import server.ScoreManager.GameStatus;
-
 public class ClientUI {
-    private BingoClient client;
+    private IBingoGame client;
     private Scanner scanner;
     private int currentPlayerId;
     private static final int MAX_ATTEMPTS = 10;
     private boolean isGameInProgress;
 
-    public ClientUI(BingoClient client) {
+    public ClientUI(IBingoGame client) {
         this.client = client;
         this.scanner = new Scanner(System.in);
         this.isGameInProgress = false;
@@ -39,7 +38,7 @@ public class ClientUI {
         System.out.print("Votre choix : ");
     }
 
-    private void handleMenuChoice(int choice) {
+    private void handleMenuChoice(int choice) throws RemoteException {
         try {
             switch (choice) {
                 case 1:
@@ -54,19 +53,19 @@ public class ClientUI {
                 default:
                     System.out.println("Choix invalide. Veuillez réessayer.");
             }
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException e) {
             System.out.println("Erreur de communication avec le serveur : " + e.getMessage());
         }
     }
 
-    private void playBingo() throws IOException, ClassNotFoundException {
+    private void playBingo() throws RemoteException {
         if (isGameInProgress) {
             System.out.println("Une partie est déjà en cours!");
             return;
         }
 
         // Démarrer une nouvelle partie
-        currentPlayerId = client.startGame();
+        currentPlayerId = client.startNewGame();
         isGameInProgress = true;
         int correctGuesses = 0;
 
@@ -85,24 +84,33 @@ public class ClientUI {
                 continue;
             }
 
-            boolean isCorrect = client.makeGuess(guess);
+            boolean isCorrect = client.makeGuess(currentPlayerId, guess);
 
             if (isCorrect) {
-                System.out.println("Correct! Bien joué!");
                 correctGuesses++;
+                System.out.println("Correct! Bien joué!");
+                displayGameResult(correctGuesses);
+                
+                // Ask if the user wants to play again
+                if (!askToPlayAgain()) {
+                    break;
+                }
+                
+                // Restart the game
+                currentPlayerId = client.startNewGame();
+                correctGuesses = 0;
+                attempt = 0; // Reset attempts for new game
             } else {
                 System.out.println("Incorrect! Essayez encore!");
             }
 
             // Vérifier si la partie est terminée
-            GameStatus status = client.getGameStatus();
-            if (status == GameStatus.COMPLETED) {
+            String status = client.getGameStatus(currentPlayerId);
+            if (IBingoGame.GameStatus.COMPLETED.equals(status)) {
                 break;
             }
         }
 
-        // Afficher le résultat final
-        displayGameResult(correctGuesses);
         isGameInProgress = false;
     }
 
@@ -122,7 +130,7 @@ public class ClientUI {
         }
     }
 
-    private void displayGameResult(int correctGuesses) {
+    private void displayGameResult(int correctGuesses) throws RemoteException {
         System.out.println("\n=== Fin de la partie ===");
         System.out.println("Votre score : " + correctGuesses + "/" + MAX_ATTEMPTS);
         System.out.println("Pourcentage de réussite : " + 
@@ -138,7 +146,14 @@ public class ClientUI {
         }
     }
 
-    private void showHighScore() throws IOException, ClassNotFoundException {
+    private boolean askToPlayAgain() {
+        System.out.print("\nVoulez-vous jouer à nouveau? (oui/non): ");
+        String response = scanner.next().trim().toLowerCase();
+        
+        return response.equals("oui") || response.equals("o");
+    }
+
+    private void showHighScore() throws RemoteException {
         int highScore = client.getHighestScore();
         System.out.println("\n=== Meilleur Score ===");
         System.out.println("Le meilleur score est : " + highScore + "/" + MAX_ATTEMPTS);
@@ -146,13 +161,6 @@ public class ClientUI {
 
     private void quit() throws IOException {
         System.out.println("Merci d'avoir joué! Au revoir!");
-        client.close();
         System.exit(0);
-    }
-
-    // Méthode utilitaire pour effacer l'écran (optionnel)
-    private void clearScreen() {
-        System.out.print("\033[H\033[2J");
-        System.out.flush();
     }
 }
