@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import server.ScoreManager.GameStatus;
 
 public class BingoGameImpl extends UnicastRemoteObject implements IBingoGame {
     private static final long serialVersionUID = 1L;
@@ -53,11 +52,27 @@ public class BingoGameImpl extends UnicastRemoteObject implements IBingoGame {
     }
 
     @Override
-    public GameStatus getGameStatus(int playerId) throws RemoteException {
-        Urn urn = playerUrns.get(playerId);
-        if (urn == null) {
-            return GameStatus.NOT_STARTED;
-        }
-        return urn.isEmpty() ? GameStatus.COMPLETED : GameStatus.IN_PROGRESS;
-    }
+ // In your server-side implementation
+    public String getGameStatus(int playerId) throws RemoteException {
+    	// Return one of the status strings
+    	if (gameIsNotStarted()) {
+    	return IBingoGame.GameStatus.NOT_STARTED;
+    	} else if (gameIsCompleted()) {
+    	return IBingoGame.GameStatus.COMPLETED;
+    	} else {
+    	return IBingoGame.GameStatus.IN_PROGRESS;
+    	}
+    	}
+
+    	private boolean gameIsCompleted() {
+    	// TODO Auto-generated method stub
+    	return false;
+    	}
+
+    	private boolean gameIsNotStarted() {
+    	// TODO Auto-generated method stub
+    	return false;
+    	}
+
+    
 }
