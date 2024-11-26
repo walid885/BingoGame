@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import server.ScoreManager.GameStatus;
+import java.rmi.RemoteException;
 
-public class BingoClient {
+public class BingoClient implements IBingoGame {
     private Socket socket;
     private ObjectInputStream in;
     private ObjectOutputStream out;
@@ -14,45 +14,74 @@ public class BingoClient {
 
     public BingoClient(String host, int port) throws IOException {
         socket = new Socket(host, port);
-        // Important : créer d'abord l'OutputStream puis l'InputStream pour éviter le deadlock
+        // Important: create the OutputStream first to avoid deadlock
         out = new ObjectOutputStream(socket.getOutputStream());
-        out.flush(); // Important pour éviter les problèmes de buffer
+        out.flush(); // Important to avoid buffering issues
         in = new ObjectInputStream(socket.getInputStream());
     }
 
-    public int startGame() throws IOException, ClassNotFoundException {
-        out.writeObject("START_GAME");
-        out.flush();
-        playerId = (Integer) in.readObject();
-        return playerId;
+    @Override
+    public int startNewGame() throws RemoteException {
+        try {
+            sendCommand("START_GAME");
+            playerId = (Integer) in.readObject();
+            return playerId;
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RemoteException("Failed to start new game", e);
+        }
     }
 
-    public boolean makeGuess(int number) throws IOException, ClassNotFoundException {
-        out.writeObject("MAKE_GUESS");
-        out.writeInt(playerId);
-        out.writeInt(number);
-        out.flush();
-        return (Boolean) in.readObject();
+    @Override
+    public boolean makeGuess(int playerId, int number) throws RemoteException {
+        try {
+            sendCommand("MAKE_GUESS");
+            out.writeInt(playerId);
+            out.writeInt(number);
+            out.flush();
+
+            Object response = in.readObject();
+            if (response instanceof Boolean) {
+                return (Boolean) response;
+            } else {
+                throw new RemoteException("Unexpected response from server");
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RemoteException("Failed to make guess", e);
+        }
     }
 
-    public GameStatus getGameStatus() throws IOException, ClassNotFoundException {
-        out.writeObject("GET_GAME_STATUS");
-        out.writeInt(playerId);
-        out.flush();
-        return (GameStatus) in.readObject();
+    @Override
+    public String getGameStatus(int playerId) throws RemoteException {
+        try {
+            sendCommand("GET_GAME_STATUS");
+            out.writeInt(playerId);
+            out.flush();
+
+            Object response = in.readObject();
+            if (response instanceof String) {
+                return (String) response;
+            } else {
+                throw new RemoteException("Unexpected response from server");
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RemoteException("Failed to get game status", e);
+        }
     }
 
-    public int getHighestScore() throws IOException, ClassNotFoundException {
-        out.writeObject("GET_HIGHEST_SCORE");
-        out.flush();
-        return (Integer) in.readObject();
+    @Override
+    public int getHighestScore() throws RemoteException {
+        try {
+            sendCommand("GET_HIGHEST_SCORE");
+            return (Integer) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            throw new RemoteException("Failed to get highest score", e);
+        }
     }
 
     public void close() throws IOException {
         try {
             if (out != null) {
-                out.writeObject("QUIT");
-                out.flush();
+                sendCommand("QUIT");
             }
         } finally {
             try {
@@ -69,14 +98,14 @@ public class BingoClient {
         }
     }
 
-    // Méthode utilitaire pour vérifier la connexion
+    // Utility method to check the connection
     private void checkConnection() throws IOException {
         if (socket == null || socket.isClosed()) {
-            throw new IOException("La connexion au serveur est fermée");
+            throw new IOException("Connection to server is closed");
         }
     }
 
-    // Méthode pour envoyer une commande générique
+    // Method to send a generic command
     private void sendCommand(String command) throws IOException {
         checkConnection();
         out.writeObject(command);
